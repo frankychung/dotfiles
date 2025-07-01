@@ -41,5 +41,8 @@ After symlinking, restart your terminal or source the zsh config:
 source ~/.zshrc
 ```
 
-**Note:** The zsh configuration includes automatic tool checking that will show installation instructions for any missing dependencies when you start a new shell session.
+## Notes
+
+- The zsh configuration includes automatic tool checking that will show installation instructions for any missing dependencies when you start a new shell session.
+- WezTerm is used for terminal multiplexing instead of tmux. For remote multiplexing to work properly, both local and server installations must use the same version (nightly builds are recommended for compatibility).
 

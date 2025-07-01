@@ -55,7 +55,7 @@ _check_tool() {
 _check_tool "git" "brew install git" "sudo apt install git"  
 _check_tool "nvim" "brew install neovim" "curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage && chmod u+x nvim.appimage && mkdir -p ~/bin && mv nvim.appimage ~/bin/nvim && echo 'See: https://github.com/neovim/neovim/releases'"
 _check_tool "curl" "brew install curl" "sudo apt install curl"
-_check_tool "wezterm" "brew install --cask wezterm" "curl -fsSL https://apt.fury.io/wez/gpg.key | sudo apt-key add - && echo 'deb https://apt.fury.io/wez/ * *' | sudo tee /etc/apt/sources.list.d/wezterm.list && sudo apt update && sudo apt install wezterm"
+_check_tool "wezterm" "brew install --cask wezterm-nightly" "curl -fsSL https://apt.fury.io/wez/gpg.key | sudo apt-key add - && echo 'deb https://apt.fury.io/wez/ * *' | sudo tee /etc/apt/sources.list.d/wezterm.list && sudo apt update && sudo apt install wezterm-nightly"
 
 # Database tools
 # _check_tool "mysql" "brew install mysql" "sudo apt install mysql-server"
