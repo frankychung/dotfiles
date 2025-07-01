@@ -63,17 +63,21 @@ _check_tool "wezterm" "brew install --cask wezterm-nightly" "curl -fsSL https://
 _check_tool "mycli" "brew install mycli" "pip install --user mycli"
 _check_tool "pgcli" "brew install pgcli" "pip install --user pgcli"
 
-# Container tools
-_check_tool "docker-compose" "brew install --cask orbstack" "curl -fsSL https://get.docker.com | sh && sudo apt install docker-compose-plugin"
-
 # Platform-specific tools
 if [[ "$OSTYPE" == "darwin"* ]]; then
     if ! command -v brew &>/dev/null; then
         echo "⚠️  Homebrew not found. Install with:"
         echo "   /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
     fi
+    
+    # Container tools (macOS only)
+    _check_tool "docker-compose" "brew install --cask orbstack" "# Not needed on Linux"
 else
-    _check_tool "build-essential" "# N/A on macOS" "sudo apt install build-essential"
+    # Check for build tools on Linux
+    if ! dpkg -l | grep -q build-essential; then
+        echo "⚠️  build-essential not found. Install with:"
+        echo "   sudo apt install build-essential"
+    fi
 fi
 
 # To add new tool checks:
