@@ -1,0 +1,30 @@
+# System files
+.DS_Store
+._*
+Thumbs.db
+
+# Secrets and sensitive files
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+.env*
+
+# Shell history and cache
+*_history
+.zsh_sessions/
+.zcompdump*
+
+# Editor temp files
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Logs
+*.log
+.nvimlog
+
+# Local machine-specific overrides
+*.local
+local/
