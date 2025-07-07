@@ -89,6 +89,13 @@ config.keys = {
 		mods = "LEADER",
 		action = wezterm.action.ActivateLastTab,
 	},
+
+	-- Rotate panes clockwise
+	{
+		key = "r",
+		mods = "CMD",
+		action = wezterm.action.RotatePanes("Clockwise"),
+	},
 }
 
 config.font = wezterm.font("PragmataPro")
@@ -127,5 +134,23 @@ config.ssh_domains = {
 -- config.default_gui_startup_args = { "connect", "unix" }
 
 config.window_decorations = "RESIZE"
+
+-- Format tab title to show zoom state like tmux
+wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
+	local title = tab.active_pane.title
+	if tab.tab_title and #tab.tab_title > 0 then
+		title = tab.tab_title
+	end
+
+	-- Add zoom indicator like tmux
+	local zoom_indicator = ""
+	if tab.active_pane.is_zoomed then
+		zoom_indicator = "[Z]"
+	end
+
+	-- Recreate default behavior: tab index + title with padding
+	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
+	return string.format(" %d: %s%s ", index, title, zoom_indicator)
+end)
 
 return config
