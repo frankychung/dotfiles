@@ -8,8 +8,7 @@ end
 
 config.leader = { key = "b", mods = "CTRL", timeout_milliseconds = 1000 }
 
-config.keys = {
-	-- Split pane horizontally (new pane below)
+config.keys = { -- Split pane horizontally (new pane below)
 	{
 		key = "d",
 		mods = "CMD",
@@ -133,7 +132,8 @@ config.ssh_domains = {
 -- This seems to break startup. Whatevs, not needed locally
 -- config.default_gui_startup_args = { "connect", "unix" }
 
-config.window_decorations = "RESIZE"
+-- config.window_decorations = "RESIZE"
+config.window_decorations = "RESIZE | MACOS_FORCE_DISABLE_SHADOW"
 
 -- Format tab title to show zoom state like tmux
 wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)

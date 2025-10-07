@@ -1,7 +1,18 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# The $SELECTED variable is available for space components and indicates if
-# the space invoking this script (with name: $NAME) is currently selected:
-# https://felixkratz.github.io/SketchyBar/config/components#space----associate-mission-control-spaces-with-an-item
+# Check if this workspace has windows
+HAS_WINDOWS=$(aerospace list-windows --workspace "$1" --format '%{window-id}' 2>/dev/null)
 
-sketchybar --set $NAME background.drawing=$SELECTED
+# Only show workspace if it has windows or is focused
+if [ -n "$HAS_WINDOWS" ] || [ "$1" = "$FOCUSED_WORKSPACE" ]; then
+    if [ "$1" = "$FOCUSED_WORKSPACE" ]; then
+        sketchybar --set "$NAME" drawing=on background.drawing=on icon.color=0xff000000
+    else
+        sketchybar --set "$NAME" drawing=on background.drawing=off icon.color=0xffffffff
+    fi
+    sketchybar --set windows."$1" drawing=on
+else
+    sketchybar --set "$NAME" drawing=off
+    sketchybar --set windows."$1" drawing=off
+fi
+

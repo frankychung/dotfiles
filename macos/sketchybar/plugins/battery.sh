@@ -1,28 +1,35 @@
-#!/bin/sh
+#!/bin/bash
 
-PERCENTAGE=$(pmset -g batt | grep -Eo "\d+%" | cut -d% -f1)
-CHARGING=$(pmset -g batt | grep 'AC Power')
+# Get battery information
+BATTERY_INFO=$(pmset -g batt)
+PERCENTAGE=$(echo "$BATTERY_INFO" | grep -o '[0-9]*%' | cut -d'%' -f1)
+CHARGING=$(echo "$BATTERY_INFO" | grep -c "AC Power")
 
-if [ $PERCENTAGE = "" ]; then
-  exit 0
+# Convert percentage to number for comparison
+PERCENTAGE_NUM=$((10#$PERCENTAGE))
+
+# Determine battery icon based on charge level
+if [ $PERCENTAGE_NUM -ge 85 ]; then
+  BATTERY_ICON="" # You'll replace with 100-85% icon
+elif [ $PERCENTAGE_NUM -ge 60 ]; then
+  BATTERY_ICON="" # You'll replace with 85-60% icon
+elif [ $PERCENTAGE_NUM -ge 35 ]; then
+  BATTERY_ICON="" # You'll replace with 60-35% icon
+elif [ $PERCENTAGE_NUM -ge 10 ]; then
+  BATTERY_ICON="" # You'll replace with 35-10% icon
+else
+  BATTERY_ICON="" # You'll replace with 10-0% icon
 fi
 
-case ${PERCENTAGE} in
-  9[0-9]|100) ICON=""
-  ;;
-  [6-8][0-9]) ICON=""
-  ;;
-  [3-5][0-9]) ICON=""
-  ;;
-  [1-2][0-9]) ICON=""
-  ;;
-  *) ICON=""
-esac
-
-if [[ $CHARGING != "" ]]; then
-  ICON=""
+# Add charging icon if plugged in
+if [ $CHARGING -gt 0 ]; then
+  CHARGING_ICON="󱐋" # You'll replace with charging icon
+  ICON="${BATTERY_ICON}${CHARGING_ICON}"
+  LABEL="${PERCENTAGE}%"
+else
+  ICON="$BATTERY_ICON"
+  LABEL="${PERCENTAGE}%"
 fi
 
-# The item invoking this script (name $NAME) will get its icon and label
-# updated with the current battery status
-sketchybar --set $NAME icon="$ICON" label="${PERCENTAGE}%"
+sketchybar --set "$NAME" icon="$ICON" label="$LABEL"
+
