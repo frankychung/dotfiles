@@ -18,8 +18,8 @@ get_app_icon() {
   "LINE")
     echo "󱋊"
     ;;
-  "Orion")
-    echo "󰫣"
+  "Messages")
+    echo "󱋊"
     ;;
   "Google Chrome")
     echo ""
@@ -50,6 +50,15 @@ get_app_icon() {
     ;;
   "Fantastical")
     echo "󰃭"
+    ;;
+  "Finder")
+    echo "󰉖"
+    ;;
+  "Zen")
+    echo "󰺕"
+    ;;
+  "1Password")
+    echo ""
     ;;
   # Add more apps here following this pattern:
   # "App Name")

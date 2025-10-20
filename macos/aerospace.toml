@@ -215,7 +215,7 @@ automatically-unhide-macos-hidden-apps = false
     alt-shift-h = ['join-with left', 'mode main']
     alt-shift-j = ['join-with down', 'mode main']
     alt-shift-k = ['join-with up', 'mode main']
-    alt-shikt-l = ['join-with right', 'mode main']
+    alt-shift-l = ['join-with right', 'mode main']
 
     down = 'volume down'
     up = 'volume up'

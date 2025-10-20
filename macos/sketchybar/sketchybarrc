@@ -37,11 +37,11 @@ sketchybar --default icon.font="PragmataPro:Regular:10.0" \
 
 ##### Adding Left Items (Spaces) #####
 # Add spaces label with nerd font icon
-sketchybar --add item spaces_label left \
-  --set spaces_label icon="󰇄" \
-  icon.color=0xffffffff \
-  label.drawing=off \
-  padding_right=8
+# sketchybar --add item spaces_label left \
+#   --set spaces_label icon="󰇄" \
+#   icon.color=0xffffffff \
+#   label.drawing=off \
+#   padding_right=8
 
 # Add aerospace workspace change event
 sketchybar --add event aerospace_workspace_change
@@ -102,13 +102,13 @@ sketchybar --add item battery right \
   label.padding_left=4 \
   padding_left=12
 
-sketchybar --subscribe battery system_woke power_source_change \
-  --add item wifi right \
-  --set wifi script="$PLUGIN_DIR/wifi.sh" \
-  icon="" \
-  label.drawing=off \
-  padding_left=12 \
-  --subscribe wifi wifi_change
+# sketchybar --subscribe battery system_woke power_source_change \
+#   --add item wifi right \
+#   --set wifi script="$PLUGIN_DIR/wifi.sh" \
+#   icon="" \
+#   label.drawing=off \
+#   padding_left=12 \
+#   --subscribe wifi wifi_change
 
 sketchybar --add item volume right \
   --set volume script="$PLUGIN_DIR/volume.sh" \
