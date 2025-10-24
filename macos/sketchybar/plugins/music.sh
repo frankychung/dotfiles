@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Safety check: ensure NAME is set
+if [ -z "$NAME" ]; then
+  exit 0
+fi
+
 # Check if we're using built-in display only (not external monitor)
 # If system_profiler shows only 1 display AND it's not an external brand, we're on laptop only
 DISPLAY_INFO=$(system_profiler SPDisplaysDataType)

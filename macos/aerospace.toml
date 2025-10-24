@@ -12,8 +12,11 @@
 #   - 0xff585b70 (Surface1 - medium gray)
 #   - 0xff6c7086 (Surface2 - lighter gray) <- current
 #   - 0xff7f849c (Overlay0 - subtle gray)
+#
+#   - 0x00000000 (fully transparent)
 after-startup-command = [
-  'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0xff6c7086 width=6.0'
+  'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0',
+  'exec-and-forget sketchybar'
 ]
 
 # Start AeroSpace at login

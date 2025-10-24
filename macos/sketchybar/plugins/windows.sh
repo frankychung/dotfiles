@@ -60,6 +60,12 @@ get_app_icon() {
   "1Password")
     echo ""
     ;;
+  "Photos")
+    echo ""
+    ;;
+  "Maps")
+    echo "󰍏"
+    ;;
   # Add more apps here following this pattern:
   # "App Name")
   #     echo "󰊯"  # Your chosen icon

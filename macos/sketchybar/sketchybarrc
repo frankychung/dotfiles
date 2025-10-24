@@ -124,6 +124,8 @@ sketchybar --add item weather right \
   label.padding_left=4 \
   padding_left=12
 
+sketchybar --add event music_update
+
 sketchybar --add item music right \
   --set music script="$PLUGIN_DIR/music.sh" \
   update_freq=2 \
