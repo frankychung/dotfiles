@@ -46,6 +46,16 @@ default-root-container-orientation = 'auto'
 # Fallback value (if you omit the key): on-focused-monitor-changed = []
 on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 
+# Toggle borders based on window count
+on-focus-changed = ['''exec-and-forget /bin/bash -c '
+  WINDOW_COUNT=$(aerospace list-windows --workspace focused --format "%{window-id}" | wc -l | tr -d " ")
+  if [ "$WINDOW_COUNT" -gt 1 ]; then
+    borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0 &
+  else
+    borders active_color=0x00000000 inactive_color=0x00000000 width=6.0 &
+  fi
+' ''']
+
 # Notify Sketchybar about workspace change
 exec-on-workspace-change = ['/bin/bash', '-c',
   'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE'
