@@ -1,0 +1,65 @@
+# Paneru Configuration
+
+[options]
+focus_follows_mouse = true
+mouse_follows_focus = true
+preset_column_widths = [0.33, 0.4, 0.50, 0.85]
+animation_speed = 50
+auto_center = false
+
+# Gestures disabled - remove this comment and add swipe_gesture_fingers = 4 to enable
+
+[bindings]
+# Focus windows (alt + hjkl)
+window_focus_west = "alt - h"
+window_focus_east = "alt - l"
+# window_focus_north = "alt - k"
+# window_focus_south = "alt - j"
+
+# Swap/move windows (alt + shift + hjkl)
+window_swap_west = "alt + shift - h"
+window_swap_east = "alt + shift - l"
+# window_swap_north = "alt + shift - k"
+# window_swap_south = "alt + shift - j"
+
+# Virtual workspaces (vertical stacking)
+window_virtual_north = "alt - k"
+window_virtual_south = "alt - j"
+window_virtualmove_north = "alt + shift - k"
+window_virtualmove_south = "alt + shift - j"
+
+
+# Jump to first/last window
+window_focus_first = "alt - a"
+window_focus_last = "alt - d"
+window_swap_first = "alt + shift - a"
+window_swap_last = "alt + shift - d"
+
+# Window actions
+window_center = "alt - c"
+window_resize = "alt - r"
+window_shrink = "alt + shift - r"
+window_fullwidth = "alt - f"
+window_manage = "alt - t"
+
+# Stacking (group windows in same column)
+window_stack = "alt - s"
+window_unstack = "alt + shift - s"
+
+# Multi-monitor
+window_nextdisplay = "alt - n"
+
+# Quit paneru
+quit = "alt + shift - q"
+
+# Window rules - add app-specific rules here
+# [windows.example]
+# title = ".*"
+# bundle_id = "com.example.app"
+# floating = true
+#
+[windows.all]
+# Matches all windows and adds a few pixels of spacing to their borders.
+title = ".*"
+horizontal_padding = 3
+vertical_padding = 0
