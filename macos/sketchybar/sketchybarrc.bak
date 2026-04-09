@@ -35,12 +35,42 @@ sketchybar --default icon.font="PragmataPro:Regular:10.0" \
   padding_left=4 \
   padding_right=4
 
-##### Adding Left Items (Open Apps) #####
-sketchybar --add item open_apps left \
-  --set open_apps script="$PLUGIN_DIR/open_apps.sh" \
-  update_freq=10 \
-  icon.drawing=off \
-  --subscribe open_apps front_app_switched
+##### Adding Left Items (Spaces) #####
+# Add spaces label with nerd font icon
+# sketchybar --add item spaces_label left \
+#   --set spaces_label icon="󰇄" \
+#   icon.color=0xffffffff \
+#   label.drawing=off \
+#   padding_right=8
+
+# Add aerospace workspace change event
+sketchybar --add event aerospace_workspace_change
+
+# Add aerospace workspaces (numbers 1-9 and letters A-Z)
+for sid in $(aerospace list-workspaces --all); do
+  sketchybar --add item space.$sid left \
+    --subscribe space.$sid aerospace_workspace_change \
+    --set space.$sid \
+    icon="$sid" \
+    icon.padding_left=4 \
+    icon.padding_right=4 \
+    label.drawing=off \
+    background.color=0xffffffff \
+    background.corner_radius=4 \
+    background.height=13 \
+    background.drawing=off \
+    click_script="aerospace workspace $sid" \
+    script="$PLUGIN_DIR/space.sh $sid" \
+    padding_right=0
+
+  sketchybar --add item windows.$sid left \
+    --subscribe windows.$sid front_app_switched \
+    --set windows.$sid \
+    script="$PLUGIN_DIR/windows.sh" \
+    icon.drawing=off \
+    padding_left=2 \
+    padding_right=8
+done
 
 ##### Adding Center Items (Current App) #####
 sketchybar --add item front_app center \
