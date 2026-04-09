@@ -11,14 +11,7 @@ return {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
-        rescriptls = {
-          cmd = { "rescript-language-server", "--stdio" },
-          filetypes = { "rescript" },
-          root_dir = function(fname)
-            return require("lspconfig.util").root_pattern("bsconfig.json", "rescript.json")(fname)
-          end,
-          settings = {},
-        },
+        rescriptls = {},
       },
     },
   },
