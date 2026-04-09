@@ -98,10 +98,8 @@ if _check_tool "rg" "brew install ripgrep" "sudo apt install ripgrep"; then
 fi
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-# Zoxide (replaces fasd)
-if _check_tool "zoxide" "brew install zoxide" "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"; then
-    eval "$(zoxide init zsh)"
-fi
+# Zoxide check (init moved to end of file)
+_check_tool "zoxide" "brew install zoxide" "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"
 
 # Pure prompt
 if [[ -d "$HOME/.zsh/pure" ]]; then
@@ -198,13 +196,14 @@ elif command -v fd-find &>/dev/null; then
 fi
 
 
-# Zoxide aliases (if available)
-if command -v zoxide &>/dev/null; then
-    alias cd="z"
-fi
-
 PATH="/Users/franky/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/franky/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
 PERL_LOCAL_LIB_ROOT="/Users/franky/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
 PERL_MB_OPT="--install_base \"/Users/franky/perl5\""; export PERL_MB_OPT;
 PERL_MM_OPT="INSTALL_BASE=/Users/franky/perl5"; export PERL_MM_OPT;
+
+# Zoxide init MUST be last in .zshrc
+if command -v zoxide &>/dev/null; then
+    export _ZO_DOCTOR=0  # suppress false positive in non-interactive shells (e.g. Claude Code)
+    eval "$(zoxide init zsh --cmd cd)"
+fi
