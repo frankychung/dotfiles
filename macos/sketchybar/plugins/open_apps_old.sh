@@ -11,7 +11,6 @@ get_app_icon() {
     echo "󱋊"
     ;;
   "Google Chrome")
-    echo ""
     echo ""
     ;;
   "WezTerm")
