@@ -15,7 +15,7 @@
 #
 #   - 0x00000000 (fully transparent)
 after-startup-command = [
-  'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0',
+  # 'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0',
   'exec-and-forget sketchybar',
 ]
 
@@ -29,7 +29,7 @@ enable-normalization-opposite-orientation-for-nested-containers = true
 # See: https://nikitabobko.github.io/AeroSpace/guide#layouts
 # The 'accordion-padding' specifies the size of accordion padding
 # You can set 0 to disable the padding feature
-accordion-padding = 30
+accordion-padding = 20
 
 # Possible values: tiles|accordion
 default-root-container-layout = 'tiles'
@@ -48,14 +48,14 @@ on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 
 # Toggle borders based on window count
 on-focus-changed = [
-  '''exec-and-forget /bin/bash -c '
-  WINDOW_COUNT=$(aerospace list-windows --workspace focused --format "%{window-id}" | wc -l | tr -d " ")
-  if [ "$WINDOW_COUNT" -gt 1 ]; then
-    borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0 &
-  else
-    borders active_color=0x00000000 inactive_color=0x00000000 width=6.0 &
-  fi
-' ''',
+  #   '''exec-and-forget /bin/bash -c '
+  #   WINDOW_COUNT=$(aerospace list-windows --workspace focused --format "%{window-id}" | wc -l | tr -d " ")
+  #   if [ "$WINDOW_COUNT" -gt 1 ]; then
+  #     borders active_color=0xffcba6f7 inactive_color=0x00000000 width=6.0 &
+  #   else
+  #     borders active_color=0x00000000 inactive_color=0x00000000 width=6.0 &
+  #   fi
+  # ' ''',
 ]
 
 # Notify Sketchybar about workspace change
@@ -84,15 +84,18 @@ preset = 'qwerty'
 #                 See:
 #                 https://nikitabobko.github.io/AeroSpace/guide#assign-workspaces-to-monitors
 [gaps]
-inner.horizontal = 10
-inner.vertical = 10
-outer.left = 10
-outer.bottom = 10
-outer.top = [
-  { monitor."built-in" = 0 },
-  34,
-] #32 is the ootch size, but making it a little more because of the borders
-outer.right = 10
+# inner.horizontal = 0
+# inner.vertical = 0
+# outer.left = 0
+# outer.bottom = 0
+# outer.top = [{ monitor."built-in" = 0 }, 0]
+# outer.right = 0
+inner.horizontal = 6
+inner.vertical = 6
+outer.left = 6
+outer.bottom = 6
+outer.top = [{ monitor."built-in" = 0 }, 28]
+outer.right = 6
 
 # 'main' binding mode declaration
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
