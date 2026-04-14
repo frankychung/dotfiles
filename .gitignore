@@ -21,6 +21,10 @@ id_ed25519*
 *~
 .netrwhist
 
+# Tool runtime data
+.claude/
+.playwright-cli/
+
 # Logs
 *.log
 .nvimlog
