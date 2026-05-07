@@ -87,7 +87,7 @@ local function rebalance_panes(window, _pane)
 		local col_segments = {}
 		for _, left in ipairs(lefts) do
 			local rep = columns_by_left[left][1]
-			table.insert(col_segments, { pane = rep, pos = rep.left, size = rep.width })
+			table.insert(col_segments, { pane = rep.pane, pos = rep.left, size = rep.width })
 		end
 		equalize_along_axis(window, col_segments, "Right", "Left")
 	end
@@ -99,7 +99,7 @@ local function rebalance_panes(window, _pane)
 		if #col >= 2 then
 			local row_segments = {}
 			for _, p in ipairs(col) do
-				table.insert(row_segments, { pane = p, pos = p.top, size = p.height })
+				table.insert(row_segments, { pane = p.pane, pos = p.top, size = p.height })
 			end
 			equalize_along_axis(window, row_segments, "Down", "Up")
 		end
