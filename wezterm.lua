@@ -6,68 +6,13 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
--- Issue ActivatePaneByIndex + AdjustPaneSize perform_action pairs to equalize the
--- sizes of N adjacent segments along one axis.
+-- Equalize the widths of two-column layouts in the active tab.
+-- No-op when the tab has 1 column or 3+ columns, or when a pane is zoomed.
 --
--- segments: array of N { index, pos, size } entries, sorted along the axis.
---   index is the pane's index within the tab (for ActivatePaneByIndex).
---   pos is the segment's leading-edge coordinate (left for cols, top for rows).
---   size is the segment's extent along the axis (width for cols, height for rows).
--- grow_dir / shrink_dir: AdjustPaneSize directions for the forward / backward axis.
---   columns: "Right" / "Left"     rows: "Down" / "Up"
---
--- AdjustPaneSize grows the active pane in the given direction by pushing its neighbor
--- on that side, and uses the window's currently active pane regardless of what's
--- passed to perform_action. So each resize must be preceded by an ActivatePaneByIndex
--- targeting the segment we want to grow. Each pair is issued as two perform_action
--- calls -- the action queue processes them in order, so the activation takes effect
--- before its paired resize reads the active pane state.
---
--- To move boundary i forward (delta > 0) we grow segment i forward (segment i+1 is
--- its forward neighbor to push). To move it backward (delta < 0) we grow segment i+1
--- backward (segment i is its backward neighbor). Acting on the leading or trailing
--- segment toward the window edge is a silent no-op.
---
--- Each move changes only segments i and i+1 by equal-and-opposite amounts, leaving
--- every other segment's `pos + size` invariant, so cached values from a single
--- panes_with_info() call remain valid for all subsequent boundaries on this axis.
-local function equalize_along_axis(window, focused_pane, segments, grow_dir, shrink_dir)
-	local n = #segments
-	if n < 2 then
-		return false
-	end
-
-	local total = 0
-	for _, s in ipairs(segments) do
-		total = total + s.size
-	end
-	local target = math.floor(total / n)
-	local origin = segments[1].pos
-
-	local issued_any = false
-	for i = 1, n - 1 do
-		local target_boundary = origin + i * target
-		local current_boundary = segments[i].pos + segments[i].size
-		local delta = target_boundary - current_boundary
-		if delta ~= 0 then
-			local resize, target_index
-			if delta > 0 then
-				resize = wezterm.action.AdjustPaneSize({ grow_dir, delta })
-				target_index = segments[i].index
-			else
-				resize = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
-				target_index = segments[i + 1].index
-			end
-			window:perform_action(wezterm.action.ActivatePaneByIndex(target_index), focused_pane)
-			window:perform_action(resize, focused_pane)
-			issued_any = true
-		end
-	end
-	return issued_any
-end
-
--- Equalize column widths and per-column row heights in the active tab.
--- No-op when the active pane is zoomed.
+-- AdjustPaneSize uses the window's currently active pane regardless of what's
+-- passed to perform_action. To make this work in all four (focused-column, delta-sign)
+-- combinations, the column that needs to grow is activated first; restoring the
+-- user's original focus afterward is queued as a follow-up action.
 local function rebalance_panes(window, focused_pane)
 	local tab = window:active_tab()
 	if not tab then
@@ -86,55 +31,61 @@ local function rebalance_panes(window, focused_pane)
 		end
 	end
 
-	-- Group panes by column (`left`), keeping a sorted list of distinct lefts.
-	local columns_by_left = {}
+	-- Collect distinct column positions (unique `left` values).
+	local seen = {}
 	local lefts = {}
 	for _, p in ipairs(panes) do
-		if not columns_by_left[p.left] then
-			columns_by_left[p.left] = {}
+		if not seen[p.left] then
+			seen[p.left] = true
 			table.insert(lefts, p.left)
 		end
-		table.insert(columns_by_left[p.left], p)
 	end
+
+	if #lefts ~= 2 then
+		return
+	end
+
 	table.sort(lefts)
-	for _, left in ipairs(lefts) do
-		table.sort(columns_by_left[left], function(a, b)
-			return a.top < b.top
-		end)
-	end
+	local left_col, right_col = lefts[1], lefts[2]
 
-	local issued_any = false
-
-	-- Pass 1: equalize column widths. Representative pane per column is its
-	-- first row (any pane in the column would do; width is shared).
-	if #lefts >= 2 then
-		local col_segments = {}
-		for _, left in ipairs(lefts) do
-			local rep = columns_by_left[left][1]
-			table.insert(col_segments, { index = rep.index, pos = rep.left, size = rep.width })
-		end
-		if equalize_along_axis(window, focused_pane, col_segments, "Right", "Left") then
-			issued_any = true
+	-- Within a column, every pane shares width; pick any pane in each column as
+	-- the activation target for that column.
+	local left_w, right_w
+	local left_pane, right_pane
+	for _, p in ipairs(panes) do
+		if p.left == left_col and not left_w then
+			left_w = p.width
+			left_pane = p.pane
+		elseif p.left == right_col and not right_w then
+			right_w = p.width
+			right_pane = p.pane
 		end
 	end
 
-	-- Pass 2: equalize row heights within each column. Cached top/height are
-	-- still valid here -- width changes from Pass 1 do not affect them.
-	for _, left in ipairs(lefts) do
-		local col = columns_by_left[left]
-		if #col >= 2 then
-			local row_segments = {}
-			for _, p in ipairs(col) do
-				table.insert(row_segments, { index = p.index, pos = p.top, size = p.height })
-			end
-			if equalize_along_axis(window, focused_pane, row_segments, "Down", "Up") then
-				issued_any = true
-			end
-		end
+	local target = math.floor((left_w + right_w) / 2)
+	local delta = target - left_w
+	if delta == 0 then
+		return
 	end
 
-	-- Restore the user's original focus once the resize sequence is queued.
-	if issued_any and original_index then
+	-- delta > 0: left column needs to grow. Activate any left-column pane and
+	-- push the inter-column boundary right.
+	-- delta < 0: right column needs to grow. Activate a right-column pane and
+	-- push the boundary left.
+	local target_pane, action
+	if delta > 0 then
+		target_pane = left_pane
+		action = wezterm.action.AdjustPaneSize({ "Right", delta })
+	else
+		target_pane = right_pane
+		action = wezterm.action.AdjustPaneSize({ "Left", -delta })
+	end
+
+	target_pane:activate()
+	window:perform_action(action, focused_pane)
+
+	-- Restore focus after the resize processes (queued to run after the resize).
+	if original_index then
 		window:perform_action(wezterm.action.ActivatePaneByIndex(original_index), focused_pane)
 	end
 end
