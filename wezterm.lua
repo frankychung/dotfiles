@@ -194,27 +194,6 @@ end
 
 config.color_scheme = scheme_for_appearance(wezterm.gui.get_appearance())
 
--- Configure local Unix domain for local multiplexing
-config.unix_domains = {
-	{
-		name = "unix",
-	},
-}
-
--- Configure SSH domain for remote multiplexing
-config.ssh_domains = {
-	{
-		name = "coursebasedev",
-		remote_address = "172.105.204.67",
-		username = "franky",
-	},
-}
-
--- Auto-connect to local domain on startup
--- This seems to break startup. Whatevs, not needed locally
--- config.default_gui_startup_args = { "connect", "unix" }
--- config.default_domain = "unix"
-
 config.window_decorations = "RESIZE"
 -- config.window_decorations = "RESIZE | MACOS_FORCE_DISABLE_SHADOW"
 
