@@ -8,6 +8,69 @@ end
 
 -- config.leader = { key = "b", mods = "CTRL", timeout_milliseconds = 1000 }
 
+-- Equalize the widths of two-column layouts in the active tab.
+-- No-op when the tab has 1 column or 3+ columns, or when a pane is zoomed.
+local function rebalance_columns(window, pane)
+	local tab = window:active_tab()
+	if not tab then
+		return
+	end
+
+	local panes = tab:panes_with_info()
+
+	-- Skip while a pane is zoomed; AdjustPaneSize is meaningless under zoom
+	for _, p in ipairs(panes) do
+		if p.is_active and p.is_zoomed then
+			return
+		end
+	end
+
+	-- Collect distinct column positions (unique `left` values)
+	local seen = {}
+	local lefts = {}
+	for _, p in ipairs(panes) do
+		if not seen[p.left] then
+			seen[p.left] = true
+			table.insert(lefts, p.left)
+		end
+	end
+
+	if #lefts ~= 2 then
+		return
+	end
+
+	table.sort(lefts)
+	local left_col, right_col = lefts[1], lefts[2]
+
+	-- Within a column, all panes share the same width; pick any representative
+	local left_w, right_w
+	for _, p in ipairs(panes) do
+		if p.left == left_col and not left_w then
+			left_w = p.width
+		elseif p.left == right_col and not right_w then
+			right_w = p.width
+		end
+	end
+
+	local target = math.floor((left_w + right_w) / 2)
+	local delta = target - left_w
+	if delta == 0 then
+		return
+	end
+
+	-- AdjustPaneSize moves the inter-column boundary regardless of which
+	-- pane is active: {Right, n} pushes the boundary right (left grows,
+	-- right shrinks); {Left, n} pushes it left (left shrinks, right grows).
+	local action
+	if delta > 0 then
+		action = wezterm.action.AdjustPaneSize({ "Right", delta })
+	else
+		action = wezterm.action.AdjustPaneSize({ "Left", -delta })
+	end
+
+	window:perform_action(action, pane)
+end
+
 config.keys = { -- Split pane horizontally (new pane below)
 	{
 		key = "d",
@@ -94,6 +157,13 @@ config.keys = { -- Split pane horizontally (new pane below)
 		key = "r",
 		mods = "CMD",
 		action = wezterm.action.RotatePanes("Clockwise"),
+	},
+
+	-- Rebalance two-column pane layout
+	{
+		key = "phys:Equal",
+		mods = "CMD|SHIFT",
+		action = wezterm.action_callback(rebalance_columns),
 	},
 
 	-- -- Enter resize mode
