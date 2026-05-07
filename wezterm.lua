@@ -6,7 +6,7 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
--- Append ActivatePaneByIndex + AdjustPaneSize pairs to `actions` to equalize the
+-- Issue ActivatePaneByIndex + AdjustPaneSize perform_action pairs to equalize the
 -- sizes of N adjacent segments along one axis.
 --
 -- segments: array of N { index, pos, size } entries, sorted along the axis.
@@ -19,10 +19,9 @@ end
 -- AdjustPaneSize grows the active pane in the given direction by pushing its neighbor
 -- on that side, and uses the window's currently active pane regardless of what's
 -- passed to perform_action. So each resize must be preceded by an ActivatePaneByIndex
--- targeting the segment we want to grow. Sub-actions inside a Multiple are processed
--- sequentially, so the activation takes effect before the immediately following
--- AdjustPaneSize -- unlike calling pane:activate() in a Lua loop, which queues all
--- activations to run concurrently with no ordering relative to the resize queue.
+-- targeting the segment we want to grow. Each pair is issued as two perform_action
+-- calls -- the action queue processes them in order, so the activation takes effect
+-- before its paired resize reads the active pane state.
 --
 -- To move boundary i forward (delta > 0) we grow segment i forward (segment i+1 is
 -- its forward neighbor to push). To move it backward (delta < 0) we grow segment i+1
@@ -32,10 +31,10 @@ end
 -- Each move changes only segments i and i+1 by equal-and-opposite amounts, leaving
 -- every other segment's `pos + size` invariant, so cached values from a single
 -- panes_with_info() call remain valid for all subsequent boundaries on this axis.
-local function equalize_along_axis(actions, segments, grow_dir, shrink_dir)
+local function equalize_along_axis(window, focused_pane, segments, grow_dir, shrink_dir)
 	local n = #segments
 	if n < 2 then
-		return
+		return false
 	end
 
 	local total = 0
@@ -45,6 +44,7 @@ local function equalize_along_axis(actions, segments, grow_dir, shrink_dir)
 	local target = math.floor(total / n)
 	local origin = segments[1].pos
 
+	local issued_any = false
 	for i = 1, n - 1 do
 		local target_boundary = origin + i * target
 		local current_boundary = segments[i].pos + segments[i].size
@@ -58,10 +58,12 @@ local function equalize_along_axis(actions, segments, grow_dir, shrink_dir)
 				resize = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
 				target_index = segments[i + 1].index
 			end
-			table.insert(actions, wezterm.action.ActivatePaneByIndex(target_index))
-			table.insert(actions, resize)
+			window:perform_action(wezterm.action.ActivatePaneByIndex(target_index), focused_pane)
+			window:perform_action(resize, focused_pane)
+			issued_any = true
 		end
 	end
+	return issued_any
 end
 
 -- Equalize column widths and per-column row heights in the active tab.
@@ -101,7 +103,7 @@ local function rebalance_panes(window, focused_pane)
 		end)
 	end
 
-	local actions = {}
+	local issued_any = false
 
 	-- Pass 1: equalize column widths. Representative pane per column is its
 	-- first row (any pane in the column would do; width is shared).
@@ -111,7 +113,9 @@ local function rebalance_panes(window, focused_pane)
 			local rep = columns_by_left[left][1]
 			table.insert(col_segments, { index = rep.index, pos = rep.left, size = rep.width })
 		end
-		equalize_along_axis(actions, col_segments, "Right", "Left")
+		if equalize_along_axis(window, focused_pane, col_segments, "Right", "Left") then
+			issued_any = true
+		end
 	end
 
 	-- Pass 2: equalize row heights within each column. Cached top/height are
@@ -123,20 +127,16 @@ local function rebalance_panes(window, focused_pane)
 			for _, p in ipairs(col) do
 				table.insert(row_segments, { index = p.index, pos = p.top, size = p.height })
 			end
-			equalize_along_axis(actions, row_segments, "Down", "Up")
+			if equalize_along_axis(window, focused_pane, row_segments, "Down", "Up") then
+				issued_any = true
+			end
 		end
 	end
 
-	if #actions == 0 then
-		return
+	-- Restore the user's original focus once the resize sequence is queued.
+	if issued_any and original_index then
+		window:perform_action(wezterm.action.ActivatePaneByIndex(original_index), focused_pane)
 	end
-
-	-- Restore the user's original focus after the resize sequence.
-	if original_index then
-		table.insert(actions, wezterm.action.ActivatePaneByIndex(original_index))
-	end
-
-	window:perform_action(wezterm.action.Multiple(actions), focused_pane)
 end
 
 config.keys = { -- Split pane horizontally (new pane below)
