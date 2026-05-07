@@ -6,8 +6,6 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
--- config.leader = { key = "b", mods = "CTRL", timeout_milliseconds = 1000 }
-
 -- Equalize the widths of two-column layouts in the active tab.
 -- No-op when the tab has 1 column or 3+ columns, or when a pane is zoomed.
 local function rebalance_columns(window, pane)
@@ -165,16 +163,6 @@ config.keys = { -- Split pane horizontally (new pane below)
 		mods = "CMD|SHIFT",
 		action = wezterm.action_callback(rebalance_columns),
 	},
-
-	-- -- Enter resize mode
-	-- {
-	-- 	key = "r",
-	-- 	mods = "LEADER",
-	-- 	action = wezterm.action.ActivateKeyTable({
-	-- 		name = "resize_pane",
-	-- 		one_shot = false,
-	-- 	}),
-	-- },
 }
 
 config.font = wezterm.font("PragmataPro")
@@ -246,20 +234,5 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
 	return string.format(" %d: %s%s%s ", index, title, zoom_indicator, indicators)
 end)
-
-config.key_tables = {
-	resize_pane = {
-		{ key = "h", action = wezterm.action.AdjustPaneSize({ "Left", 1 }) },
-		{ key = "l", action = wezterm.action.AdjustPaneSize({ "Right", 1 }) },
-		{ key = "k", action = wezterm.action.AdjustPaneSize({ "Up", 1 }) },
-		{ key = "j", action = wezterm.action.AdjustPaneSize({ "Down", 1 }) },
-		{ key = "H", action = wezterm.action.AdjustPaneSize({ "Left", 2 }) },
-		{ key = "L", action = wezterm.action.AdjustPaneSize({ "Right", 2 }) },
-		{ key = "K", action = wezterm.action.AdjustPaneSize({ "Up", 2 }) },
-		{ key = "J", action = wezterm.action.AdjustPaneSize({ "Down", 2 }) },
-		{ key = "Escape", action = "PopKeyTable" },
-		{ key = "Enter", action = "PopKeyTable" },
-	},
-}
 
 return config
