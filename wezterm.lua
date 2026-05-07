@@ -9,16 +9,22 @@ end
 -- Equalize sizes of N adjacent segments along one axis.
 --
 -- segments: array of N { pane, pos, size } entries, sorted along the axis.
---   pane is the representative pane used to drive AdjustPaneSize for that segment.
+--   pane is the MuxPane userdata used as the action target for that segment.
 --   pos is the segment's leading-edge coordinate (left for cols, top for rows).
 --   size is the segment's extent along the axis (width for cols, height for rows).
--- grow_dir / shrink_dir: AdjustPaneSize directions that grow / shrink segment i.
+-- grow_dir / shrink_dir: AdjustPaneSize directions for the forward / backward axis.
 --   columns: "Right" / "Left"     rows: "Down" / "Up"
 --
--- Each AdjustPaneSize on boundary i changes segment i and i+1 by equal-and-opposite
--- amounts, leaving every other segment's `pos + size` invariant. So we can compute
--- each boundary's current position from the cached `pos + size` of the segment to
--- its left, even after earlier moves on the same axis.
+-- AdjustPaneSize grows the target pane in the given direction by pushing its neighbor
+-- on that side. To move boundary i forward (delta > 0), we grow segment i forward
+-- (it has segment i+1 as the forward neighbor). To move it backward (delta < 0), we
+-- grow segment i+1 backward (it has segment i as the backward neighbor). Picking the
+-- pane that actually has a neighbor in the push direction is essential -- acting on
+-- the topmost / leftmost segment with a backward direction is a silent no-op.
+--
+-- Each move changes only segments i and i+1 by equal-and-opposite amounts, leaving
+-- every other segment's `pos + size` invariant, so cached values from a single
+-- panes_with_info() call remain valid for all subsequent boundaries on this axis.
 local function equalize_along_axis(window, segments, grow_dir, shrink_dir)
 	local n = #segments
 	if n < 2 then
@@ -37,13 +43,15 @@ local function equalize_along_axis(window, segments, grow_dir, shrink_dir)
 		local current_boundary = segments[i].pos + segments[i].size
 		local delta = target_boundary - current_boundary
 		if delta ~= 0 then
-			local action
+			local action, target_pane
 			if delta > 0 then
 				action = wezterm.action.AdjustPaneSize({ grow_dir, delta })
+				target_pane = segments[i].pane
 			else
 				action = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
+				target_pane = segments[i + 1].pane
 			end
-			window:perform_action(action, segments[i].pane)
+			window:perform_action(action, target_pane)
 		end
 	end
 end
