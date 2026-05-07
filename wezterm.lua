@@ -210,29 +210,9 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 		claude_indicator = "󰚩"
 	end
 
-	-- Count caffeinate instances across all panes in this tab
-	local caffeinate_count = 0
-	for _, p in ipairs(tab.panes) do
-		if p.title:match("^%S+: caffeinate") or p.title == "caffeinate" then
-			caffeinate_count = caffeinate_count + 1
-		end
-	end
-	local caffeinate_indicator = ""
-	if caffeinate_count > 0 then
-		caffeinate_indicator = "󰅶"
-	end
-
-	-- Build indicators with space between them if both present
-	local indicators = ""
-	if claude_indicator ~= "" and caffeinate_indicator ~= "" then
-		indicators = claude_indicator .. " " .. caffeinate_indicator
-	else
-		indicators = claude_indicator .. caffeinate_indicator
-	end
-
 	-- Recreate default behavior: tab index + title with padding
 	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
-	return string.format(" %d: %s%s%s ", index, title, zoom_indicator, indicators)
+	return string.format(" %d: %s%s%s ", index, title, zoom_indicator, claude_indicator)
 end)
 
 return config
