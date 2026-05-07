@@ -6,9 +6,51 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
--- Equalize the widths of two-column layouts in the active tab.
--- No-op when the tab has 1 column or 3+ columns, or when a pane is zoomed.
-local function rebalance_columns(window, pane)
+-- Equalize sizes of N adjacent segments along one axis.
+--
+-- segments: array of N { pane, pos, size } entries, sorted along the axis.
+--   pane is the representative pane used to drive AdjustPaneSize for that segment.
+--   pos is the segment's leading-edge coordinate (left for cols, top for rows).
+--   size is the segment's extent along the axis (width for cols, height for rows).
+-- grow_dir / shrink_dir: AdjustPaneSize directions that grow / shrink segment i.
+--   columns: "Right" / "Left"     rows: "Down" / "Up"
+--
+-- Each AdjustPaneSize on boundary i changes segment i and i+1 by equal-and-opposite
+-- amounts, leaving every other segment's `pos + size` invariant. So we can compute
+-- each boundary's current position from the cached `pos + size` of the segment to
+-- its left, even after earlier moves on the same axis.
+local function equalize_along_axis(window, segments, grow_dir, shrink_dir)
+	local n = #segments
+	if n < 2 then
+		return
+	end
+
+	local total = 0
+	for _, s in ipairs(segments) do
+		total = total + s.size
+	end
+	local target = math.floor(total / n)
+	local origin = segments[1].pos
+
+	for i = 1, n - 1 do
+		local target_boundary = origin + i * target
+		local current_boundary = segments[i].pos + segments[i].size
+		local delta = target_boundary - current_boundary
+		if delta ~= 0 then
+			local action
+			if delta > 0 then
+				action = wezterm.action.AdjustPaneSize({ grow_dir, delta })
+			else
+				action = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
+			end
+			window:perform_action(action, segments[i].pane)
+		end
+	end
+end
+
+-- Equalize column widths and per-column row heights in the active tab.
+-- No-op when the active pane is zoomed.
+local function rebalance_panes(window, _pane)
 	local tab = window:active_tab()
 	if not tab then
 		return
@@ -16,57 +58,52 @@ local function rebalance_columns(window, pane)
 
 	local panes = tab:panes_with_info()
 
-	-- Skip while a pane is zoomed; AdjustPaneSize is meaningless under zoom
 	for _, p in ipairs(panes) do
 		if p.is_active and p.is_zoomed then
 			return
 		end
 	end
 
-	-- Collect distinct column positions (unique `left` values)
-	local seen = {}
+	-- Group panes by column (`left`), keeping a sorted list of distinct lefts.
+	local columns_by_left = {}
 	local lefts = {}
 	for _, p in ipairs(panes) do
-		if not seen[p.left] then
-			seen[p.left] = true
+		if not columns_by_left[p.left] then
+			columns_by_left[p.left] = {}
 			table.insert(lefts, p.left)
 		end
+		table.insert(columns_by_left[p.left], p)
 	end
-
-	if #lefts ~= 2 then
-		return
-	end
-
 	table.sort(lefts)
-	local left_col, right_col = lefts[1], lefts[2]
+	for _, left in ipairs(lefts) do
+		table.sort(columns_by_left[left], function(a, b)
+			return a.top < b.top
+		end)
+	end
 
-	-- Within a column, all panes share the same width; pick any representative
-	local left_w, right_w
-	for _, p in ipairs(panes) do
-		if p.left == left_col and not left_w then
-			left_w = p.width
-		elseif p.left == right_col and not right_w then
-			right_w = p.width
+	-- Pass 1: equalize column widths. Representative pane per column is its
+	-- first row (any pane in the column would do; width is shared).
+	if #lefts >= 2 then
+		local col_segments = {}
+		for _, left in ipairs(lefts) do
+			local rep = columns_by_left[left][1]
+			table.insert(col_segments, { pane = rep, pos = rep.left, size = rep.width })
+		end
+		equalize_along_axis(window, col_segments, "Right", "Left")
+	end
+
+	-- Pass 2: equalize row heights within each column. Cached top/height are
+	-- still valid here -- width changes from Pass 1 do not affect them.
+	for _, left in ipairs(lefts) do
+		local col = columns_by_left[left]
+		if #col >= 2 then
+			local row_segments = {}
+			for _, p in ipairs(col) do
+				table.insert(row_segments, { pane = p, pos = p.top, size = p.height })
+			end
+			equalize_along_axis(window, row_segments, "Down", "Up")
 		end
 	end
-
-	local target = math.floor((left_w + right_w) / 2)
-	local delta = target - left_w
-	if delta == 0 then
-		return
-	end
-
-	-- AdjustPaneSize moves the inter-column boundary regardless of which
-	-- pane is active: {Right, n} pushes the boundary right (left grows,
-	-- right shrinks); {Left, n} pushes it left (left shrinks, right grows).
-	local action
-	if delta > 0 then
-		action = wezterm.action.AdjustPaneSize({ "Right", delta })
-	else
-		action = wezterm.action.AdjustPaneSize({ "Left", -delta })
-	end
-
-	window:perform_action(action, pane)
 end
 
 config.keys = { -- Split pane horizontally (new pane below)
@@ -157,11 +194,11 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.RotatePanes("Clockwise"),
 	},
 
-	-- Rebalance two-column pane layout
+	-- Rebalance: equalize column widths and per-column row heights
 	{
 		key = "phys:Equal",
 		mods = "CMD|SHIFT",
-		action = wezterm.action_callback(rebalance_columns),
+		action = wezterm.action_callback(rebalance_panes),
 	},
 }
 
