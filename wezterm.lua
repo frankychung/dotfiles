@@ -22,6 +22,10 @@ end
 -- pane that actually has a neighbor in the push direction is essential -- acting on
 -- the topmost / leftmost segment with a backward direction is a silent no-op.
 --
+-- AdjustPaneSize uses the window's *currently active* pane regardless of what we
+-- pass to perform_action, so we must ActivatePane each target pane before issuing
+-- the resize. The caller is expected to restore the user's original focus afterward.
+--
 -- Each move changes only segments i and i+1 by equal-and-opposite amounts, leaving
 -- every other segment's `pos + size` invariant, so cached values from a single
 -- panes_with_info() call remain valid for all subsequent boundaries on this axis.
@@ -51,6 +55,7 @@ local function equalize_along_axis(window, segments, grow_dir, shrink_dir)
 				action = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
 				target_pane = segments[i + 1].pane
 			end
+			target_pane:activate()
 			window:perform_action(action, target_pane)
 		end
 	end
@@ -58,7 +63,7 @@ end
 
 -- Equalize column widths and per-column row heights in the active tab.
 -- No-op when the active pane is zoomed.
-local function rebalance_panes(window, _pane)
+local function rebalance_panes(window, focused_pane)
 	local tab = window:active_tab()
 	if not tab then
 		return
@@ -111,6 +116,12 @@ local function rebalance_panes(window, _pane)
 			end
 			equalize_along_axis(window, row_segments, "Down", "Up")
 		end
+	end
+
+	-- Restore the user's original focus (equalize_along_axis activated panes
+	-- as it went so AdjustPaneSize would target each one in turn).
+	if focused_pane then
+		focused_pane:activate()
 	end
 end
 
