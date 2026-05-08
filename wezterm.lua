@@ -6,13 +6,58 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
--- Equalize the widths of two-column layouts in the active tab.
--- No-op when the tab has 1 column or 3+ columns, or when a pane is zoomed.
+-- Plan an equalize-along-axis pass and append { target, action } steps to `plans`.
+--
+-- segments: array of N { pane, pos, size } entries, sorted along the axis.
+-- grow_dir / shrink_dir: AdjustPaneSize directions for the forward / backward axis
+--   (columns: "Right" / "Left"; rows: "Down" / "Up").
+--
+-- Each AdjustPaneSize on boundary i changes only segments i and i+1 by
+-- equal-and-opposite amounts, so cached `pos + size` values remain valid for all
+-- subsequent boundaries on the same axis. To move boundary i forward (delta > 0)
+-- we grow segment i; to move it backward we grow segment i+1. Acting on the
+-- leading or trailing segment toward the window edge would be a silent no-op.
+local function plan_equalize_axis(plans, segments, grow_dir, shrink_dir)
+	local n = #segments
+	if n < 2 then
+		return
+	end
+
+	local total = 0
+	for _, s in ipairs(segments) do
+		total = total + s.size
+	end
+	local target = math.floor(total / n)
+	local origin = segments[1].pos
+
+	for i = 1, n - 1 do
+		local target_boundary = origin + i * target
+		local current_boundary = segments[i].pos + segments[i].size
+		local delta = target_boundary - current_boundary
+		if delta ~= 0 then
+			local target_pane, action
+			if delta > 0 then
+				target_pane = segments[i].pane
+				action = wezterm.action.AdjustPaneSize({ grow_dir, delta })
+			else
+				target_pane = segments[i + 1].pane
+				action = wezterm.action.AdjustPaneSize({ shrink_dir, -delta })
+			end
+			table.insert(plans, { target = target_pane, action = action })
+		end
+	end
+end
+
+-- Equalize column widths (only when there are exactly 2 columns) and per-column
+-- row heights in the active tab. No-op when the active pane is zoomed.
 --
 -- AdjustPaneSize uses the window's currently active pane regardless of what's
--- passed to perform_action. To make this work in all four (focused-column, delta-sign)
--- combinations, the column that needs to grow is activated first; restoring the
--- user's original focus afterward is queued as a follow-up action.
+-- passed to perform_action. Doing multiple sync pane:activate() calls in a row
+-- only leaves the LAST one effective by the time the action queue drains, so
+-- chained activate+resize pairs misdirect every resize except the last. Instead,
+-- we plan all the steps up front, then execute them one per Lua callback with
+-- wezterm.time.call_after between, so the action queue drains (and mux state
+-- settles) before each subsequent activate.
 local function rebalance_panes(window, focused_pane)
 	local tab = window:active_tab()
 	if not tab then
@@ -31,63 +76,73 @@ local function rebalance_panes(window, focused_pane)
 		end
 	end
 
-	-- Collect distinct column positions (unique `left` values).
-	local seen = {}
+	-- Group panes by column (`left`), keeping a sorted list of distinct lefts
+	-- and per-column lists sorted by top.
+	local columns_by_left = {}
 	local lefts = {}
 	for _, p in ipairs(panes) do
-		if not seen[p.left] then
-			seen[p.left] = true
+		if not columns_by_left[p.left] then
+			columns_by_left[p.left] = {}
 			table.insert(lefts, p.left)
 		end
+		table.insert(columns_by_left[p.left], p)
 	end
-
-	if #lefts ~= 2 then
-		return
-	end
-
 	table.sort(lefts)
-	local left_col, right_col = lefts[1], lefts[2]
+	for _, left in ipairs(lefts) do
+		table.sort(columns_by_left[left], function(a, b)
+			return a.top < b.top
+		end)
+	end
 
-	-- Within a column, every pane shares width; pick any pane in each column as
-	-- the activation target for that column.
-	local left_w, right_w
-	local left_pane, right_pane
-	for _, p in ipairs(panes) do
-		if p.left == left_col and not left_w then
-			left_w = p.width
-			left_pane = p.pane
-		elseif p.left == right_col and not right_w then
-			right_w = p.width
-			right_pane = p.pane
+	local plans = {}
+
+	-- Column pass: only when there are exactly 2 columns. Representative pane
+	-- per column is its first row (any pane in the column would do).
+	if #lefts == 2 then
+		local col_segments = {}
+		for _, left in ipairs(lefts) do
+			local rep = columns_by_left[left][1]
+			table.insert(col_segments, { pane = rep.pane, pos = rep.left, size = rep.width })
+		end
+		plan_equalize_axis(plans, col_segments, "Right", "Left")
+	end
+
+	-- Row pass: equalize row heights inside each column. Cached top/height
+	-- values are still valid here -- column-pass width changes don't affect
+	-- them.
+	for _, left in ipairs(lefts) do
+		local col = columns_by_left[left]
+		if #col >= 2 then
+			local row_segments = {}
+			for _, p in ipairs(col) do
+				table.insert(row_segments, { pane = p.pane, pos = p.top, size = p.height })
+			end
+			plan_equalize_axis(plans, row_segments, "Down", "Up")
 		end
 	end
 
-	local target = math.floor((left_w + right_w) / 2)
-	local delta = target - left_w
-	if delta == 0 then
+	if #plans == 0 then
 		return
 	end
 
-	-- delta > 0: left column needs to grow. Activate any left-column pane and
-	-- push the inter-column boundary right.
-	-- delta < 0: right column needs to grow. Activate a right-column pane and
-	-- push the boundary left.
-	local target_pane, action
-	if delta > 0 then
-		target_pane = left_pane
-		action = wezterm.action.AdjustPaneSize({ "Right", delta })
-	else
-		target_pane = right_pane
-		action = wezterm.action.AdjustPaneSize({ "Left", -delta })
+	-- Execute one plan per Lua callback, separated by short delays so the
+	-- action queue can drain between activations.
+	local function step(idx)
+		if idx > #plans then
+			if original_index then
+				window:perform_action(wezterm.action.ActivatePaneByIndex(original_index), focused_pane)
+			end
+			return
+		end
+		local plan = plans[idx]
+		plan.target:activate()
+		window:perform_action(plan.action, focused_pane)
+		wezterm.time.call_after(0.05, function()
+			step(idx + 1)
+		end)
 	end
 
-	target_pane:activate()
-	window:perform_action(action, focused_pane)
-
-	-- Restore focus after the resize processes (queued to run after the resize).
-	if original_index then
-		window:perform_action(wezterm.action.ActivatePaneByIndex(original_index), focused_pane)
-	end
+	step(1)
 end
 
 config.keys = { -- Split pane horizontally (new pane below)
