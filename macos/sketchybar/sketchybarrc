@@ -38,7 +38,7 @@ sketchybar --default icon.font="PragmataPro:Regular:10.0" \
 ##### Adding Left Items (Open Apps) #####
 sketchybar --add item open_apps left \
   --set open_apps script="$PLUGIN_DIR/open_apps.sh" \
-  update_freq=10 \
+  update_freq=5 \
   icon.drawing=off \
   --subscribe open_apps front_app_switched
 
