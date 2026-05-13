@@ -83,33 +83,43 @@ Base config from [nvim-mini/MiniMax](https://github.com/nvim-mini/MiniMax), copi
 
 ### LSP (Language Server Protocol)
 
+MiniMax duplicates most of nvim's built-in LSP defaults under `<Leader>l*` because `gr` is taken by mini.operators' "replace" (so the `gr*` defaults would be shadowed). Both forms work — pick whichever you prefer.
+
 **Navigating code:**
 
 | Key | Action |
 |-----|--------|
 | `<Space>ls` | Go to definition |
-| `<Space>lt` | Type definition |
-| `<Space>li` | Implementation |
-| `<Space>lR` | References — list all usages |
-| `<Space>lh` | Hover — show docs/type info |
-| `<C-o>` | Jump back after navigating |
+| `<C-]>` | Go to definition (via `tagfunc`, set to `vim.lsp.tagfunc` on LspAttach) |
+| `<C-T>` | Jump back from tag |
+| `<Space>lt` / `grt` | Type definition |
+| `<Space>li` / `gri` | Implementation |
+| `<Space>lR` / `grr` | References — list all usages |
+| `<Space>lh` / `K` | Hover — show docs/type info |
+| `gO` | Document symbol outline (built-in default) |
+| `<C-o>` | Jump back after navigating (jumplist, not LSP-specific) |
+
+> **Note:** `gd` is **not** LSP — it's Vim's built-in "go to local declaration" (text search within the current file). It works for local variables but won't follow imports. Use `<Space>ls` or `<C-]>` for real LSP definition navigation.
 
 **Editing:**
 
 | Key | Action |
 |-----|--------|
-| `<Space>lr` | Rename symbol across project |
-| `<Space>la` | Code actions (quick fixes, refactors) |
+| `<Space>lr` / `grn` | Rename symbol across project |
+| `<Space>la` / `gra` | Code actions (quick fixes, refactors) — also works in visual mode |
 | `<Space>lf` | Format file (conform.nvim, LSP fallback) |
+| `<C-S>` (insert/select) | Signature help |
 
 **Diagnostics:**
 
 | Key | Action |
 |-----|--------|
-| `<Space>ld` | Show full error at cursor |
+| `<Space>ld` | Show full error at cursor (diagnostic float) |
+| `<C-W>d` | Same as above (built-in default) |
 | `<Space>fd` | Fuzzy find all workspace diagnostics |
 | `<Space>fD` | Fuzzy find buffer diagnostics |
-| `[d` / `]d` | Previous/next diagnostic |
+| `[d` / `]d` | Previous / next diagnostic |
+| `[D` / `]D` | First / last diagnostic in buffer |
 
 **Finding symbols:**
 
@@ -120,11 +130,17 @@ Base config from [nvim-mini/MiniMax](https://github.com/nvim-mini/MiniMax), copi
 
 **Completion (Insert mode):**
 
-- Start typing — popup after 100ms
+- Start typing — popup after 100ms (via `mini.completion`, powered by LSP)
 - `<Tab>` / `<S-Tab>` — navigate candidates
 - `<C-f>` / `<C-b>` — scroll info window
 - `<C-e>` — dismiss
 - `(` — shows signature help
+
+**Passive features (no keymap needed):**
+
+- Diagnostic virtual text and gutter signs
+- Inlay hints (if server supports them) — toggle with `:lua vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())`
+- Semantic tokens — **disabled** in this config (see `after/plugin/lsp.lua`) as a workaround for neovim/neovim#36257
 
 ### Switch buffers
 
