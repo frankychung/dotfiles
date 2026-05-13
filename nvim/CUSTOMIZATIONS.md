@@ -27,6 +27,7 @@ Additional treesitter languages beyond the MiniMax defaults:
 - `fsharp`
 - `rescript`
 - `javascript`, `typescript`, `tsx`, `jsdoc`
+- `rust`
 
 ## F# — `after/plugin/treesitter.lua` + `after/lsp/fsautocomplete.lua`
 
@@ -43,3 +44,8 @@ Additional treesitter languages beyond the MiniMax defaults:
 - Treesitter `javascript`, `typescript`, `tsx`, `jsdoc` parsers
 - ts_ls LSP server with `checkJs` enabled for type checking in plain .js files
 - Uses the TypeScript bundled with the project (no global install needed)
+
+## Rust — `after/plugin/treesitter.lua` + `after/lsp/rust_analyzer.lua`
+
+- Treesitter `rust` parser
+- rust_analyzer LSP server (requires `rust-analyzer` — install via `rustup component add rust-analyzer` or `brew install rust-analyzer`)

@@ -6,6 +6,7 @@ Config.now_if_args(function()
     'typescript',
     'tsx',
     'jsdoc',
+    'rust',
   }
 
   local isnt_installed = function(lang)

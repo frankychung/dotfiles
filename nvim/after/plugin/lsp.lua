@@ -1,4 +1,4 @@
-vim.lsp.enable({ 'marksman', 'fsautocomplete', 'rescriptls', 'ts_ls' })
+vim.lsp.enable({ 'marksman', 'fsautocomplete', 'rescriptls', 'ts_ls', 'rust_analyzer' })
 
 -- Workaround for nvim 0.12 bug: some LSP servers return invalid semantic token
 -- lengths causing 100% CPU infinite loop. See neovim/neovim#36257.
