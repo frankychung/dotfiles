@@ -1,48 +1,39 @@
 # Dotfiles
 
-## Prerequisites
-
-1. Install zsh (if not already installed):
-
-   ```bash
-   # macOS (using Homebrew)
-   brew install zsh
-   
-   # Ubuntu/Debian
-   sudo apt install zsh
-   
-   # Set as default shell
-   chsh -s $(which zsh)
-   ```
-
 ## Setup
 
-Create symlinks for the configuration files (adjust the dotfiles path to wherever you cloned this repo):
+Create symlinks (adjust the dotfiles path as needed):
 
 ```bash
-# Zsh configuration
-ln -s /path/to/your/dotfiles/zshrc ~/.zshrc
+# Zsh
+ln -s ~/dev/dotfiles/zshrc ~/.zshrc
 
-# Neovim configuration
-ln -s /path/to/your/dotfiles/nvim ~/.config/nvim
+# Neovim (MiniMax config for nvim 0.12+)
+ln -s ~/dev/dotfiles/nvim ~/.config/nvim
 
-# Wezterm configuration
-ln -s /path/to/your/dotfiles/wezterm.lua ~/.wezterm.lua
+# tmux
+ln -s ~/dev/dotfiles/tmux.conf ~/.tmux.conf
 
-# macOS window management (optional)
-ln -s /path/to/your/dotfiles/macos/sketchybar ~/.config/sketchybar
-ln -s /path/to/your/dotfiles/macos/yabairc ~/.yabairc
-ln -s /path/to/your/dotfiles/macos/skhdrc ~/.skhdrc
+# WezTerm
+ln -s ~/dev/dotfiles/wezterm.lua ~/.wezterm.lua
+
+# Claude Code statusline
+ln -s ~/dev/dotfiles/.claude/statusline-command.sh ~/.claude/statusline-command.sh
+
+# macOS only
+ln -s ~/dev/dotfiles/macos/paneru.toml ~/.paneru.toml
+ln -s ~/dev/dotfiles/macos/sketchybar ~/.config/sketchybar
 ```
 
-After symlinking, restart your terminal or source the zsh config:
+## What's Included
 
-```bash
-source ~/.zshrc
-```
-
-## Notes
-
-- The zsh configuration includes automatic tool checking that will show installation instructions for any missing dependencies when you start a new shell session.
-- WezTerm is used for terminal multiplexing instead of tmux. For remote multiplexing to work properly, both local and server installations must use the same version (nightly builds are recommended for compatibility).
+- **zshrc** — Zsh config with vi mode, history, and automatic tool-check on startup
+- **nvim/** — Neovim config using MiniMax (mini.nvim based)
+- **tmux.conf** — tmux configuration
+- **wezterm.lua** — WezTerm terminal config
+- **.claude/statusline-command.sh** — Claude Code statusline (cost, token bar, rate limit, model, branch, dir)
+- **macos/** — macOS-specific configs:
+  - **paneru.toml** — Paneru window manager
+  - **sketchybar/** — status bar
+  - `*.bak` — archived configs (aerospace, yabai, skhd)
 
