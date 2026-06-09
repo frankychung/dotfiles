@@ -307,6 +307,23 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.SwitchWorkspaceRelative(1),
 	},
 
+	-- Toggle dark<->light across every window. Reads the focused window's
+	-- current scheme and flips all windows to the other one. (macOS only sends
+	-- the appearance-change event to the focused window, so a manual toggle is
+	-- the reliable way to flip every workspace at once.)
+	{
+		key = "t",
+		mods = "CTRL|CMD|SHIFT",
+		action = wezterm.action_callback(function(window, pane)
+			local dark, light = "Catppuccin Macchiato", "Catppuccin Latte"
+			local current = window:effective_config().color_scheme
+			local next_scheme = current == light and dark or light
+			for _, w in ipairs(wezterm.gui.gui_windows()) do
+				w:set_config_overrides({ color_scheme = next_scheme })
+			end
+		end),
+	},
+
 	-- Fuzzy selector over every workspace and the panes within each one.
 	-- Workspace rows (bold, "▸ name") just switch workspace; pane rows switch
 	-- workspace AND focus that exact pane. The fuzzy filter matches the whole
