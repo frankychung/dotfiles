@@ -213,6 +213,14 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.ActivateCopyMode,
 	},
 
+	-- Send a real Escape for Ctrl+[ so it works under the kitty keyboard
+	-- protocol (e.g. exiting insert mode in Claude Code) without tmux in between
+	{
+		key = "[",
+		mods = "CTRL",
+		action = wezterm.action.SendKey({ key = "Escape" }),
+	},
+
 	-- Rename current tab
 	{
 		key = ",",
@@ -234,6 +242,7 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.ShowTabNavigator,
 	},
 
+	-- Last active tab in the current workspace.
 	{
 		key = "l",
 		mods = "CMD|SHIFT",
@@ -253,14 +262,136 @@ config.keys = { -- Split pane horizontally (new pane below)
 		mods = "CMD|SHIFT",
 		action = wezterm.action_callback(rebalance_panes),
 	},
+
+	-- Create a new workspace (SwitchToWorkspace creates it if it doesn't exist)
+	{
+		key = "n",
+		mods = "CMD|SHIFT",
+		action = wezterm.action.PromptInputLine({
+			description = "New workspace name",
+			action = wezterm.action_callback(function(window, pane, line)
+				if line and #line > 0 then
+					window:perform_action(
+						wezterm.action.SwitchToWorkspace({ name = line }),
+						pane
+					)
+				end
+			end),
+		}),
+	},
+
+	-- Rename the active workspace. Use the physical comma key: Shift+Comma
+	-- produces "<", so a character-based key = "," never matches with SHIFT.
+	{
+		key = "phys:Comma",
+		mods = "CMD|SHIFT",
+		action = wezterm.action.PromptInputLine({
+			description = "Rename workspace",
+			action = wezterm.action_callback(function(window, pane, line)
+				if line and #line > 0 then
+					wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), line)
+				end
+			end),
+		}),
+	},
+
+	-- Cycle workspaces (mirrors CMD|SHIFT+[/] for tabs)
+	{
+		key = "[",
+		mods = "CTRL|CMD|SHIFT",
+		action = wezterm.action.SwitchWorkspaceRelative(-1),
+	},
+	{
+		key = "]",
+		mods = "CTRL|CMD|SHIFT",
+		action = wezterm.action.SwitchWorkspaceRelative(1),
+	},
+
+	-- Fuzzy selector over every workspace and the panes within each one.
+	-- Workspace rows (bold, "▸ name") just switch workspace; pane rows switch
+	-- workspace AND focus that exact pane. The fuzzy filter matches the whole
+	-- label, so tab title / process / cwd are all searchable across workspaces.
+	{
+		key = "p",
+		mods = "CMD|SHIFT",
+		action = wezterm.action_callback(function(window, pane)
+			local by_ws, order = {}, {}
+			for _, w in ipairs(wezterm.mux.all_windows()) do
+				local ws = w:get_workspace()
+				if not by_ws[ws] then
+					by_ws[ws] = {}
+					table.insert(order, ws)
+				end
+				for _, t in ipairs(w:tabs()) do
+					local ttitle = t:get_title()
+					for _, p in ipairs(t:panes()) do
+						table.insert(by_ws[ws], { tab = ttitle, pane = p })
+					end
+				end
+			end
+			table.sort(order)
+
+			local choices = {}
+			for _, ws in ipairs(order) do
+				-- Workspace header row: selecting it just switches workspace.
+				table.insert(choices, {
+					id = "ws\0" .. ws,
+					label = wezterm.format({
+						{ Attribute = { Intensity = "Bold" } },
+						{ Text = "▸ " .. ws },
+					}),
+				})
+				for _, e in ipairs(by_ws[ws]) do
+					local p = e.pane
+					local cwd = p:get_current_working_dir()
+					cwd = type(cwd) == "string" and cwd or (cwd and cwd.file_path) or ""
+					local proc = (p:get_foreground_process_name() or ""):gsub(".*/", "")
+					table.insert(choices, {
+						id = "pane\0" .. ws .. "\0" .. tostring(p:pane_id()),
+						label = "    " .. e.tab .. "  ·  " .. proc .. "  " .. cwd,
+					})
+				end
+			end
+
+			window:perform_action(
+				wezterm.action.InputSelector({
+					title = "Workspaces & panes",
+					fuzzy = true,
+					choices = choices,
+					action = wezterm.action_callback(function(win, p, id)
+						if not id then
+							return
+						end
+						-- id is "\0"-delimited so workspace names with spaces or ":" are safe.
+						local parts = {}
+						for s in (id .. "\0"):gmatch("(.-)\0") do
+							table.insert(parts, s)
+						end
+						if parts[1] == "pane" then
+							local target = wezterm.mux.get_pane(tonumber(parts[3]))
+							if target then
+								target:activate() -- focus pane + its containing tab
+							end
+						end
+						win:perform_action(
+							wezterm.action.SwitchToWorkspace({ name = parts[2] }),
+							p
+						)
+					end),
+				}),
+				pane
+			)
+		end),
+	},
 }
 
 config.font = wezterm.font("PragmataPro")
 config.font_size = 12
+config.front_end = "WebGpu" -- Metal on Apple Silicon; testing if it avoids long-session render slowdowns
 config.use_fancy_tab_bar = false
 config.tab_bar_at_bottom = true
 config.show_new_tab_button_in_tab_bar = false
-config.hide_tab_bar_if_only_one_tab = true
+config.hide_tab_bar_if_only_one_tab = false
 
 function scheme_for_appearance(appearance)
 	if appearance:find("Dark") then
@@ -274,6 +405,29 @@ config.color_scheme = scheme_for_appearance(wezterm.gui.get_appearance())
 
 config.window_decorations = "RESIZE"
 -- config.window_decorations = "RESIZE | MACOS_FORCE_DISABLE_SHADOW"
+
+-- List all workspaces at the left edge of the tab bar, marking the active one
+-- with a "▸" + bold accent (ANSI green from the scheme); others are a dimmed
+-- overlay gray. The right status is cleared so nothing lingers there.
+-- (MRU pane tracking was removed from here while the last-pane feature is off.)
+wezterm.on("update-status", function(window, pane)
+	local active = window:active_workspace()
+	local dark = wezterm.gui.get_appearance():find("Dark")
+	local inactive_fg = dark and "#6e738d" or "#8c8fa1"
+	local names = wezterm.mux.get_workspace_names()
+	local cells = {}
+	table.insert(cells, { Text = "  " })
+	for i, name in ipairs(names) do
+		local is_active = name == active
+		table.insert(cells, { Foreground = is_active and { AnsiColor = "Green" } or { Color = inactive_fg } })
+		table.insert(cells, { Attribute = { Intensity = is_active and "Bold" or "Normal" } })
+		table.insert(cells, { Text = is_active and ("▸ " .. name) or name })
+		table.insert(cells, "ResetAttributes")
+		table.insert(cells, { Text = i < #names and "   " or "  " })
+	end
+	window:set_left_status(wezterm.format(cells))
+	window:set_right_status("") -- clear any stale right-status content
+end)
 
 -- Format tab title to show zoom state and Claude Code instance count
 wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
