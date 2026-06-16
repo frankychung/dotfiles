@@ -9,6 +9,7 @@ Replaces the default `miniwinter` theme with **catppuccin** and **auto-dark-mode
 - Dark mode: `catppuccin-macchiato`
 - Light mode: `catppuccin-latte`
 - Switches automatically based on macOS appearance setting
+- Manual override (auto-dark-mode doesn't fire reliably inside herdr): `:ThemeToggle` command and `<leader>tt` keymap flip light/dark by hand
 
 ## Markdown — `after/plugin/markdown.lua`
 
