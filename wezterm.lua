@@ -256,6 +256,21 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.RotatePanes("Clockwise"),
 	},
 
+	-- Force a full repaint. Works around WebGpu's lazy re-render (wezterm #3384),
+	-- where the grid goes stale until a resize/focus event. A font-size nudge
+	-- triggers the same layout + re-raster pass a manual resize does, then
+	-- reverts -- visually net-zero.
+	{
+		key = "r",
+		mods = "CMD|SHIFT",
+		action = wezterm.action_callback(function(window, pane)
+			window:perform_action(wezterm.action.IncreaseFontSize, pane)
+			wezterm.time.call_after(0.03, function()
+				window:perform_action(wezterm.action.DecreaseFontSize, pane)
+			end)
+		end),
+	},
+
 	-- Rebalance: equalize column widths and per-column row heights
 	{
 		key = "phys:Equal",
@@ -405,6 +420,7 @@ config.keys = { -- Split pane horizontally (new pane below)
 config.font = wezterm.font("PragmataPro")
 config.font_size = 12
 config.front_end = "WebGpu" -- Metal on Apple Silicon; testing if it avoids long-session render slowdowns
+config.max_fps = 120 -- default 60; lowers keystroke-to-present latency (esp. on 120Hz displays)
 config.use_fancy_tab_bar = false
 config.tab_bar_at_bottom = true
 config.show_new_tab_button_in_tab_bar = false
