@@ -469,41 +469,44 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 		zoom_indicator = "[Z]"
 	end
 
-	local claude_count, has_working, has_attention = 0, false, false
+	-- One robot per Claude pane, each colored by that pane's state. Sorted by
+	-- urgency (attention > working > idle) so the panes that need you stay
+	-- leftmost if the title is truncated. Catppuccin hues per light/dark scheme.
+	local dark = config.color_scheme == "Catppuccin Macchiato"
+	local blue = dark and "#8aadf4" or "#1e66f5"
+	local yellow = dark and "#eed49f" or "#df8e1d"
+	local green = dark and "#a6da95" or "#40a02b"
+
+	local robots = {}
 	for _, p in ipairs(tab.panes) do
 		local status = claude_status_from_title(p.title)
 		if status then
-			claude_count = claude_count + 1
-			if status == "working" then
-				has_working = true
-			end
 			local st = claude_state[p.pane_id]
-			if st and st.attention then
-				has_attention = true
+			if status == "working" then
+				table.insert(robots, { rank = 2, color = yellow })
+			elseif st and st.attention then
+				table.insert(robots, { rank = 1, color = blue })
+			else
+				table.insert(robots, { rank = 3, color = green })
 			end
 		end
 	end
+	table.sort(robots, function(a, b)
+		return a.rank < b.rank
+	end)
 
 	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
-	local items = { { Text = string.format(" %d: %s%s", index, title, zoom_indicator) } }
+	local items = { { Text = string.format(" %d: %s%s ", index, title, zoom_indicator) } }
 
-	if claude_count > 0 then
-		-- Catppuccin blue/yellow/green, per the active light/dark scheme.
-		local dark = config.color_scheme == "Catppuccin Macchiato"
-		local color
-		if has_attention then
-			color = dark and "#8aadf4" or "#1e66f5"
-		elseif has_working then
-			color = dark and "#eed49f" or "#df8e1d"
-		else
-			color = dark and "#a6da95" or "#40a02b"
-		end
-		table.insert(items, { Foreground = { Color = color } })
-		table.insert(items, { Text = "󰚩 " .. claude_count })
+	for _, r in ipairs(robots) do
+		table.insert(items, { Foreground = { Color = r.color } })
+		table.insert(items, { Text = "󰚩 " }) -- trailing space keeps adjacent robots from lapping
+	end
+	if #robots > 0 then
 		table.insert(items, "ResetAttributes")
+		table.insert(items, { Text = " " }) -- right padding so the tab isn't flush against the robot
 	end
 
-	table.insert(items, { Text = " " })
 	return wezterm.format(items)
 end)
 
