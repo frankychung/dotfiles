@@ -159,6 +159,11 @@ local function rebalance_panes(window, focused_pane)
 	tick(50)
 end
 
+-- Per-pane Claude Code state, persisting across GUI events. Maintained by the
+-- update-status handler further down; read by the "jump to attention tab"
+-- keybinding and the tab-title formatter. claude_state[pane_id] = { status, attention }.
+local claude_state = {}
+
 config.keys = { -- Split pane horizontally (new pane below)
 	{
 		key = "d",
@@ -242,7 +247,7 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action.ShowTabNavigator,
 	},
 
-	-- Last active tab in the current workspace.
+	-- Last active tab.
 	{
 		key = "l",
 		mods = "CMD|SHIFT",
@@ -278,54 +283,10 @@ config.keys = { -- Split pane horizontally (new pane below)
 		action = wezterm.action_callback(rebalance_panes),
 	},
 
-	-- Create a new workspace (SwitchToWorkspace creates it if it doesn't exist)
-	{
-		key = "n",
-		mods = "CMD|SHIFT",
-		action = wezterm.action.PromptInputLine({
-			description = "New workspace name",
-			action = wezterm.action_callback(function(window, pane, line)
-				if line and #line > 0 then
-					window:perform_action(
-						wezterm.action.SwitchToWorkspace({ name = line }),
-						pane
-					)
-				end
-			end),
-		}),
-	},
-
-	-- Rename the active workspace. Use the physical comma key: Shift+Comma
-	-- produces "<", so a character-based key = "," never matches with SHIFT.
-	{
-		key = "phys:Comma",
-		mods = "CMD|SHIFT",
-		action = wezterm.action.PromptInputLine({
-			description = "Rename workspace",
-			action = wezterm.action_callback(function(window, pane, line)
-				if line and #line > 0 then
-					wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), line)
-				end
-			end),
-		}),
-	},
-
-	-- Cycle workspaces (mirrors CMD|SHIFT+[/] for tabs)
-	{
-		key = "[",
-		mods = "CTRL|CMD|SHIFT",
-		action = wezterm.action.SwitchWorkspaceRelative(-1),
-	},
-	{
-		key = "]",
-		mods = "CTRL|CMD|SHIFT",
-		action = wezterm.action.SwitchWorkspaceRelative(1),
-	},
-
 	-- Toggle dark<->light across every window. Reads the focused window's
 	-- current scheme and flips all windows to the other one. (macOS only sends
 	-- the appearance-change event to the focused window, so a manual toggle is
-	-- the reliable way to flip every workspace at once.)
+	-- the reliable way to flip every window at once.)
 	{
 		key = "t",
 		mods = "CTRL|CMD|SHIFT",
@@ -339,80 +300,62 @@ config.keys = { -- Split pane horizontally (new pane below)
 		end),
 	},
 
-	-- Fuzzy selector over every workspace and the panes within each one.
-	-- Workspace rows (bold, "▸ name") just switch workspace; pane rows switch
-	-- workspace AND focus that exact pane. The fuzzy filter matches the whole
-	-- label, so tab title / process / cwd are all searchable across workspaces.
+	-- Fuzzy selector over every pane across all windows/tabs. The fuzzy filter
+	-- matches the whole label, so tab title / process / cwd are all searchable.
 	{
 		key = "p",
 		mods = "CMD|SHIFT",
 		action = wezterm.action_callback(function(window, pane)
-			local by_ws, order = {}, {}
+			local choices = {}
 			for _, w in ipairs(wezterm.mux.all_windows()) do
-				local ws = w:get_workspace()
-				if not by_ws[ws] then
-					by_ws[ws] = {}
-					table.insert(order, ws)
-				end
 				for _, t in ipairs(w:tabs()) do
 					local ttitle = t:get_title()
 					for _, p in ipairs(t:panes()) do
-						table.insert(by_ws[ws], { tab = ttitle, pane = p })
+						local cwd = p:get_current_working_dir()
+						cwd = type(cwd) == "string" and cwd or (cwd and cwd.file_path) or ""
+						local proc = (p:get_foreground_process_name() or ""):gsub(".*/", "")
+						table.insert(choices, {
+							id = tostring(p:pane_id()),
+							label = ttitle .. "  ·  " .. proc .. "  " .. cwd,
+						})
 					end
-				end
-			end
-			table.sort(order)
-
-			local choices = {}
-			for _, ws in ipairs(order) do
-				-- Workspace header row: selecting it just switches workspace.
-				table.insert(choices, {
-					id = "ws\0" .. ws,
-					label = wezterm.format({
-						{ Attribute = { Intensity = "Bold" } },
-						{ Text = "▸ " .. ws },
-					}),
-				})
-				for _, e in ipairs(by_ws[ws]) do
-					local p = e.pane
-					local cwd = p:get_current_working_dir()
-					cwd = type(cwd) == "string" and cwd or (cwd and cwd.file_path) or ""
-					local proc = (p:get_foreground_process_name() or ""):gsub(".*/", "")
-					table.insert(choices, {
-						id = "pane\0" .. ws .. "\0" .. tostring(p:pane_id()),
-						label = "    " .. e.tab .. "  ·  " .. proc .. "  " .. cwd,
-					})
 				end
 			end
 
 			window:perform_action(
 				wezterm.action.InputSelector({
-					title = "Workspaces & panes",
+					title = "Panes",
 					fuzzy = true,
 					choices = choices,
 					action = wezterm.action_callback(function(win, p, id)
 						if not id then
 							return
 						end
-						-- id is "\0"-delimited so workspace names with spaces or ":" are safe.
-						local parts = {}
-						for s in (id .. "\0"):gmatch("(.-)\0") do
-							table.insert(parts, s)
+						local target = wezterm.mux.get_pane(tonumber(id))
+						if target then
+							target:activate() -- focus pane + its containing tab
 						end
-						if parts[1] == "pane" then
-							local target = wezterm.mux.get_pane(tonumber(parts[3]))
-							if target then
-								target:activate() -- focus pane + its containing tab
-							end
-						end
-						win:perform_action(
-							wezterm.action.SwitchToWorkspace({ name = parts[2] }),
-							p
-						)
 					end),
 				}),
 				pane
 			)
+		end),
+	},
+
+	-- Jump to the first tab (left to right) with a Claude pane needing attention.
+	{
+		key = "]",
+		mods = "CMD",
+		action = wezterm.action_callback(function(window, pane)
+			for _, info in ipairs(window:mux_window():tabs_with_info()) do
+				for _, p in ipairs(info.tab:panes()) do
+					local st = claude_state[p:pane_id()]
+					if st and st.attention then
+						window:perform_action(wezterm.action.ActivateTab(info.index), pane)
+						return
+					end
+				end
+			end
 		end),
 	},
 }
@@ -439,57 +382,129 @@ config.color_scheme = scheme_for_appearance(wezterm.gui.get_appearance())
 config.window_decorations = "RESIZE"
 -- config.window_decorations = "RESIZE | MACOS_FORCE_DISABLE_SHADOW"
 
--- List all workspaces at the left edge of the tab bar, marking the active one
--- with a "▸" + bold accent (ANSI green from the scheme); others are a dimmed
--- overlay gray. The right status is cleared so nothing lingers there.
--- (MRU pane tracking was removed from here while the last-pane feature is off.)
-wezterm.on("update-status", function(window, pane)
-	local active = window:active_workspace()
-	local dark = wezterm.gui.get_appearance():find("Dark")
-	local inactive_fg = dark and "#6e738d" or "#8c8fa1"
-	local names = wezterm.mux.get_workspace_names()
-	local cells = {}
-	table.insert(cells, { Text = "  " })
-	for i, name in ipairs(names) do
-		local is_active = name == active
-		table.insert(cells, { Foreground = is_active and { AnsiColor = "Green" } or { Color = inactive_fg } })
-		table.insert(cells, { Attribute = { Intensity = is_active and "Bold" or "Normal" } })
-		table.insert(cells, { Text = is_active and ("▸ " .. name) or name })
-		table.insert(cells, "ResetAttributes")
-		table.insert(cells, { Text = i < #names and "   " or "  " })
+-- Classify a pane title into a Claude status, or nil if it isn't a Claude pane.
+-- Working: Claude animates a braille spinner (U+2800-U+28FF) at the start of its
+-- OSC title -- in UTF-8 that's byte1 == 0xE2 (226) and byte2 in 0xA0..0xA3
+-- (160..163). Idle/ready: title leads with ✳ (U+2733) or contains "Claude Code".
+-- Working is checked first: a leading spinner means working regardless of rest.
+local function claude_status_from_title(title)
+	if not title or title == "" then
+		return nil
 	end
-	window:set_left_status(wezterm.format(cells))
-	window:set_right_status("") -- clear any stale right-status content
+	local b1, b2 = title:byte(1, 2)
+	if b1 == 226 and b2 and b2 >= 160 and b2 <= 163 then
+		return "working"
+	end
+	if title:find("^✳") or title:find("Claude Code") then
+		return "idle"
+	end
+	return nil
+end
+
+-- Maintain the Claude attention bookkeeping once per status tick. Walk every
+-- pane, detect Working->Idle transitions (the spinner stopping == finished OR
+-- waiting for input -- the same signal from the title's view), clear the flag on
+-- the focused pane (the "I looked at it" rule), and prune closed panes.
+wezterm.on("update-status", function(window, pane)
+	local focused_id = pane and pane:pane_id() or nil
+	local seen = {}
+	local should_ding = false
+
+	for _, w in ipairs(wezterm.mux.all_windows()) do
+		for _, t in ipairs(w:tabs()) do
+			for _, p in ipairs(t:panes()) do
+				local status = claude_status_from_title(p:get_title())
+				if status then
+					local id = p:pane_id()
+					seen[id] = true
+					local prev = claude_state[id]
+					if not prev then
+						-- First sighting: seed without a transition so a freshly
+						-- spawned pane doesn't flag attention as it settles.
+						claude_state[id] = { status = status, attention = false }
+					else
+						if status == "working" then
+							prev.attention = false
+						elseif prev.status == "working" then
+							prev.attention = true
+							if id ~= focused_id then
+								should_ding = true
+							end
+						end
+						prev.status = status
+					end
+				end
+			end
+		end
+	end
+
+	if focused_id and claude_state[focused_id] then
+		claude_state[focused_id].attention = false
+	end
+
+	for id in pairs(claude_state) do
+		if not seen[id] then
+			claude_state[id] = nil
+		end
+	end
+
+	-- Chime once when an unfocused pane stops working (finished or now waiting).
+	if should_ding then
+		wezterm.background_child_process({ "afplay", "/System/Library/Sounds/Ping.aiff" })
+	end
 end)
 
--- Format tab title to show zoom state and Claude Code instance count
+-- Format tab title: tab index + title, a tmux-style zoom indicator, and a
+-- color-coded Claude indicator (robot glyph + pane count). Working/idle is read
+-- live from pane titles; attention comes from the cached state above. Color
+-- follows the most urgent state: attention (red) > working (yellow) > idle (dim).
 wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
 	local title = tab.active_pane.title
 	if tab.tab_title and #tab.tab_title > 0 then
 		title = tab.tab_title
 	end
 
-	-- Add zoom indicator like tmux
 	local zoom_indicator = ""
 	if tab.active_pane.is_zoomed then
 		zoom_indicator = "[Z]"
 	end
 
-	-- Count Claude Code instances across all panes in this tab
-	local claude_count = 0
+	local claude_count, has_working, has_attention = 0, false, false
 	for _, p in ipairs(tab.panes) do
-		if p.title:find("Claude Code") or p.title:find("^✳") then
+		local status = claude_status_from_title(p.title)
+		if status then
 			claude_count = claude_count + 1
+			if status == "working" then
+				has_working = true
+			end
+			local st = claude_state[p.pane_id]
+			if st and st.attention then
+				has_attention = true
+			end
 		end
 	end
-	local claude_indicator = ""
+
+	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
+	local items = { { Text = string.format(" %d: %s%s", index, title, zoom_indicator) } }
+
 	if claude_count > 0 then
-		claude_indicator = "󰚩"
+		-- Catppuccin blue/yellow/green, per the active light/dark scheme.
+		local dark = config.color_scheme == "Catppuccin Macchiato"
+		local color
+		if has_attention then
+			color = dark and "#8aadf4" or "#1e66f5"
+		elseif has_working then
+			color = dark and "#eed49f" or "#df8e1d"
+		else
+			color = dark and "#a6da95" or "#40a02b"
+		end
+		table.insert(items, { Foreground = { Color = color } })
+		table.insert(items, { Text = "󰚩 " .. claude_count })
+		table.insert(items, "ResetAttributes")
 	end
 
-	-- Recreate default behavior: tab index + title with padding
-	local index = tab.tab_index + 1 -- tab_index is 0-based, display as 1-based
-	return string.format(" %d: %s%s%s ", index, title, zoom_indicator, claude_indicator)
+	table.insert(items, { Text = " " })
+	return wezterm.format(items)
 end)
 
 return config
